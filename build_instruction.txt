@@ -1,0 +1,5 @@
+extract the zip file then -> import the project in android studio -> run in emulator or your android phone.
+
+if you dont want to build the apk yourself just install ola.apk file on your android phone which resides in the root directory.note that to install this apk you must allow "installation from unknown source" in android setting.
+
+I made this project just after learning android for couple of week so this app may disappoint you to some extent.
