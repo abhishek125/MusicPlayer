@@ -4,11 +4,11 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.Fragment;
 import android.app.FragmentManager;
+import android.app.FragmentTransaction;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
-import android.app.FragmentTransaction;
 import android.util.Log;
 
 public class MainActivity extends Activity implements MyAdapter.Communicator{
