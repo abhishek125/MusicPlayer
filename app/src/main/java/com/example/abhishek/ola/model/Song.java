@@ -6,16 +6,15 @@ package com.example.abhishek.ola.model;
 
 import java.util.Date;
 
-public class DataObject {
+public class Song {
     private String songName;
     private String artist;
     private String url;
     private  String cover;
-public DataObject(){
+    public Song(){
 
-}
-
-    public DataObject(String songName, String artist, String url,String cover) {
+    }
+    public Song(String songName, String artist, String url, String cover) {
         this.songName = songName;
         this.artist = artist;
         this.url = url;

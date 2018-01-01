@@ -1,6 +1,7 @@
 package com.example.abhishek.ola;
 
 import android.app.Fragment;
+import android.content.Context;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.widget.LinearLayoutManager;
@@ -9,9 +10,10 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.SearchView;
 import android.widget.Toast;
 
-import com.example.abhishek.ola.model.DataObject;
+import com.example.abhishek.ola.model.Song;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -21,22 +23,30 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.ref.WeakReference;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
-/**
- * Created by abhishek on 11/12/2017.
- */
 interface OnTaskCompleted{
-    void onTaskCompleted(DataObject[] dataObjects);
+    void onTaskCompleted(Song[] songs);
 }
 
 public class ProjectListFragment extends Fragment implements OnTaskCompleted {
-    List<DataObject> list=new ArrayList<DataObject>();
-    MyAdapter adapter;
+    private static final String ERRORINHTTP ="json error" ;
+    private List<Song> list= new ArrayList<>();
+    private MyAdapter adapter;
+
+    public List<Song> getList() {
+        return list;
+    }
+
+    public MyAdapter getAdapter() {
+        return adapter;
+    }
 
     public void onCreate(Bundle bundle){
         super.onCreate(bundle);
@@ -52,13 +62,13 @@ public class ProjectListFragment extends Fragment implements OnTaskCompleted {
         recyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
         return v;
     }
-    @Override
-    public void onTaskCompleted(DataObject[] dataObjects) {
 
-        if(dataObjects==null)
+    @Override
+    public void onTaskCompleted(Song[] songs) {
+        //some error occured
+        if(songs ==null)
             return;
-        for(DataObject dataObject:dataObjects)
-            list.add(dataObject);
+        Collections.addAll(list, songs);
         adapter.notifyDataSetChanged();
     }
     @Override
@@ -66,14 +76,13 @@ public class ProjectListFragment extends Fragment implements OnTaskCompleted {
         super.onDestroyView();
         //adapter=null;
     }
-    private class JsonTask extends AsyncTask<String, Integer, DataObject[]> {
-        public OnTaskCompleted onTaskCompleted;
-        public JsonTask(OnTaskCompleted onTaskCompleted){
-
+    private  class JsonTask extends AsyncTask<String, Integer, Song[]> {
+         OnTaskCompleted onTaskCompleted;
+         JsonTask(OnTaskCompleted onTaskCompleted){
             this.onTaskCompleted=onTaskCompleted;
         }
 
-        protected DataObject[] doInBackground(String... params) {
+        protected Song[] doInBackground(String... params) {
 
 
             HttpURLConnection connection = null;
@@ -86,13 +95,12 @@ public class ProjectListFragment extends Fragment implements OnTaskCompleted {
                 InputStream stream = connection.getInputStream();
                 reader = new BufferedReader(new InputStreamReader(stream));
                 StringBuffer buffer = new StringBuffer();
-                String line = "";
+                String line;
                 while ((line = reader.readLine()) != null) {
                     buffer.append(line + "\n");
                 }
                 String result=buffer.toString();
-                DataObject[] dataObjects=getJsonToObject(result);
-                return dataObjects;
+                return getJsonToObject(result);
             } catch (MalformedURLException e) {
                 e.printStackTrace();
             } catch (IOException e) {
@@ -115,35 +123,34 @@ public class ProjectListFragment extends Fragment implements OnTaskCompleted {
 
 
         @Override
-        protected void onPostExecute(DataObject[] dataObjects) {
-            super.onPostExecute(dataObjects);
-            onTaskCompleted.onTaskCompleted(dataObjects);
+        protected void onPostExecute(Song[] songs) {
+            super.onPostExecute(songs);
+            onTaskCompleted.onTaskCompleted(songs);
 
         }
-        public DataObject[] getJsonToObject(String json){
-            DataObject[] dataObjects=null;
+        Song[] getJsonToObject(String json){
+            Song[] songs =null;
             if (json != null) {
                 try {
 
 
                     // Getting JSON Array node
                     JSONArray projects =new JSONArray(json);
-                    dataObjects=new DataObject[projects.length()];
-                    Log.e("no of elements",projects.length()+"");
+                    songs =new Song[projects.length()];
                     // looping through All Contacts
                     for (int i = 0; i < projects.length(); i++) {
                         JSONObject c = projects.getJSONObject(i);
-                        dataObjects[i]=new DataObject();
-                        dataObjects[i].setSongName(c.getString("song"));
-                        dataObjects[i].setArtist(c.getString("artists"));
-                        dataObjects[i].setUrl(c.getString("url"));
-                        dataObjects[i].setCover(c.getString("cover_image"));
+                        songs[i]=new Song();
+                        songs[i].setSongName(c.getString("song"));
+                        songs[i].setArtist(c.getString("artists"));
+                        songs[i].setUrl(c.getString("url"));
+                        songs[i].setCover(c.getString("cover_image"));
 
 
 
                     }
                 } catch (final JSONException e) {
-                    Log.e("json error", "Json parsing error: " + e.getMessage());
+                    Log.e(ERRORINHTTP, "Json parsing error: " + e.getMessage());
                     getActivity().runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
@@ -156,18 +163,19 @@ public class ProjectListFragment extends Fragment implements OnTaskCompleted {
                 }
 
             } else {
-                Log.e("server error", "Couldn't get json from server.");
+                Log.e(ERRORINHTTP, "Couldn't get json from server.");
                 getActivity().runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
                         Toast.makeText(getActivity().getApplicationContext(),
                                 "Couldn't get json from server. Check LogCat for possible errors!",
                                 Toast.LENGTH_LONG).show();
+
                     }
                 });
             }
 
-            return dataObjects;
+            return songs;
         }
 
     }

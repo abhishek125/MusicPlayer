@@ -1,10 +1,7 @@
 package com.example.abhishek.ola;
 
 import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Environment;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.widget.RecyclerView;
@@ -12,7 +9,8 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
+import android.widget.Filter;
+import android.widget.Filterable;
 import android.widget.Toast;
 
 import com.downloader.Error;
@@ -22,49 +20,53 @@ import com.downloader.OnStartOrResumeListener;
 import com.downloader.PRDownloader;
 import com.downloader.PRDownloaderConfig;
 import com.downloader.Progress;
-import com.example.abhishek.ola.model.DataObject;
+import com.example.abhishek.ola.model.Song;
 import com.squareup.picasso.OkHttpDownloader;
 import com.squareup.picasso.Picasso;
 
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.List;
 
-/**
- * Created by abhishek on 11/12/2017.
- */
 
-public class MyAdapter extends RecyclerView.Adapter<MyViewHolder> {
-    LayoutInflater inflater;
-    List<DataObject> data;
-    Context context;
-    Communicator communicator;
+public class MyAdapter extends RecyclerView.Adapter<MyViewHolder> implements Filterable {
+    private static final String FILEERROR = "file_exist";
+    private LayoutInflater inflater;
+    private List<Song> songs;
+    private List<Song> filteredSongs;
+    private Context context;
+    private SearchFilter searchFilter;
+    private Communicator communicator;
+
+    @Override
+    public Filter getFilter() {
+        if(searchFilter == null)
+            searchFilter = new SearchFilter(this, songs);
+        return searchFilter;
+    }
 
     interface Communicator{
-        public void handleStream(String url,String filename);
-        public void handlePlay(String path,String filename);
+         void handleStream(String url,String filename);
+         void handlePlay(String path,String filename);
     }
-    public MyAdapter(Context context, List<DataObject> data){
+    MyAdapter(Context context, List<Song> songs){
         inflater=LayoutInflater.from(context);
-        this.data=data;
+        this.songs = songs;
         this.context=context;
+        communicator= (Communicator) context;
+        this.filteredSongs= songs;
     }
     @Override
     public MyViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
         View view =inflater.inflate(R.layout.custum_row,parent,false);
-        MyViewHolder myViewHolder=new MyViewHolder(view);
-        return myViewHolder;
+        return new MyViewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(final MyViewHolder holder, int position) {
-        final DataObject dataObject = data.get(position);
-        holder.songName.setText(dataObject.getSongName());
-        holder.artist.setText("artist: " + dataObject.getArtist());
-        holder.url.setText("url:" + dataObject.getUrl() + "");
+        final Song song = filteredSongs.get(position);
+        holder.songName.setText(song.getSongName());
+        holder.artist.setText(context.getString(R.string.ARTIST_NAME) + song.getArtist());
+        holder.url.setText(context.getString(R.string.URL) + song.getUrl() + "");
         Picasso.Builder builder = new Picasso.Builder(context);
         builder.listener(new Picasso.Listener() {
             @Override
@@ -73,7 +75,7 @@ public class MyAdapter extends RecyclerView.Adapter<MyViewHolder> {
             }
         });
         builder.downloader(new OkHttpDownloader(context));
-        builder.build().load(dataObject.getCover()).into(holder.cover);
+        builder.build().load(song.getCover()).into(holder.cover);
 
         final String path=getDirPath();
         if(path==null){
@@ -83,68 +85,48 @@ public class MyAdapter extends RecyclerView.Adapter<MyViewHolder> {
         holder.play.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                ((Communicator)context).handlePlay(path + "/" + dataObject.getSongName() + ".mp3",dataObject.getSongName());
+                communicator.handlePlay(path + "/" + song.getSongName() + ".mp3", song.getSongName());
             }
         });
-        if ((new File(path + "/" + dataObject.getSongName() + ".mp3")).exists()){
+        if ((new File(path + "/" + song.getSongName() + ".mp3")).exists()){
             changeUI(holder);
-            Log.e("file_exist",path + "/" + dataObject.getSongName() + ".mp3");
+            Log.e(FILEERROR,path + "/" + song.getSongName() + ".mp3");
             return;
         }
-
-    //        getRealURL(dataObject.getUrl());
 
         holder.download.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                download(dataObject.getUrl(),dataObject.getSongName()+".mp3",path,holder);
+                download(song.getUrl(), song.getSongName()+".mp3",path,holder);
             }
         });
         holder.stream.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                ((Communicator)context).handleStream(dataObject.getUrl(),dataObject.getSongName());
+                communicator.handleStream(song.getUrl(), song.getSongName());
             }
         });
 
 
 
     }
-    public static String getRealURL(String url) {
-        try {
-        HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
-        con.setInstanceFollowRedirects(false);
-        con.connect();
-        con.getInputStream();
-        if (con.getResponseCode() == HttpURLConnection.HTTP_MOVED_PERM || con.getResponseCode() == HttpURLConnection.HTTP_MOVED_TEMP) {
-            String redirectUrl = con.getHeaderField("Location");
-            Log.i("redirectedurl",redirectUrl);
-            return getRealURL(redirectUrl);
-        }
-        } catch (IOException e) {
-            e.printStackTrace();
-            Log.e("fatalError","error occured");
-        }
-        return url;
-    }
-    public void changeUI(MyViewHolder holder){
+    private void changeUI(MyViewHolder holder){
             holder.download.setVisibility(View.GONE);
             holder.stream.setVisibility(View.GONE);
             holder.play.setVisibility(View.VISIBLE);
-            Log.e("calledas",holder.songName.toString());
-        return;
+
     }
-    public  boolean isStorageGranted(){
+    private   boolean isStorageGranted(){
         return ((MainActivity)context).isStoragePermissionGranted();
     }
-    public String getDirPath(){
+    private String getDirPath(){
         boolean storage=isStorageGranted();
         boolean b=true;
         if(storage) {
             File file=new File(Environment.getExternalStorageDirectory().toString()+"/ola");
             if(!file.exists())
                  b=file.mkdirs();
-            return b==true?Environment.getExternalStorageDirectory().toString() + "/ola":null;
+            return b?Environment.getExternalStorageDirectory().toString() + "/ola":null;
         }
         else
             return null;
@@ -153,14 +135,14 @@ public class MyAdapter extends RecyclerView.Adapter<MyViewHolder> {
 
     @Override
     public int getItemCount() {
-        return data.size();
+        return filteredSongs.size();
     }
     @Override
     public int getItemViewType(int position) {
         return position;
     }
 
-    public void download(String url, String fileName, String dirPath,final MyViewHolder holder){
+    private void download(String url, String fileName, String dirPath,final MyViewHolder holder){
 
         PRDownloaderConfig config = PRDownloaderConfig.newBuilder()
                 .setReadTimeout(30_000)
@@ -168,7 +150,7 @@ public class MyAdapter extends RecyclerView.Adapter<MyViewHolder> {
                 .build();
 
         PRDownloader.initialize(context.getApplicationContext(), config);
-        int downloadId = PRDownloader.download(url, dirPath, fileName)
+        PRDownloader.download(url, dirPath, fileName)
                         .build()
                         .setOnStartOrResumeListener(new OnStartOrResumeListener() {
                             @Override
@@ -197,31 +179,6 @@ public class MyAdapter extends RecyclerView.Adapter<MyViewHolder> {
 
 
                         });
-    }
-
-    private class DownloadImageTask extends AsyncTask<String, Void, Bitmap> {
-        ImageView bmImage;
-
-        public DownloadImageTask(ImageView bmImage) {
-            this.bmImage = bmImage;
-        }
-
-        protected Bitmap doInBackground(String... urls) {
-            String urldisplay = urls[0];
-            Bitmap mIcon11 = null;
-            try {
-                InputStream in = new java.net.URL(urldisplay).openStream();
-                mIcon11 = BitmapFactory.decodeStream(in);
-            } catch (Exception e) {
-                Log.e("Error in image", e.getMessage());
-                e.printStackTrace();
-            }
-            return mIcon11;
-        }
-
-        protected void onPostExecute(Bitmap result) {
-            bmImage.setImageBitmap(result);
-        }
     }
 
 

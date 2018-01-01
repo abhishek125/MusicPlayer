@@ -9,8 +9,6 @@ import android.net.Uri;
 import android.os.Binder;
 import android.os.IBinder;
 import android.support.annotation.Nullable;
-import android.util.Log;
-
 import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.SimpleExoPlayer;
@@ -25,10 +23,6 @@ import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
 import com.google.android.exoplayer2.util.Util;
 
 import java.io.File;
-
-/**
- * Created by abhishek on 12/21/2017.
- */
 
 public class StreamService extends Service{
     public SimpleExoPlayer player;
@@ -47,8 +41,10 @@ public class StreamService extends Service{
     public void setPlayer(SimpleExoPlayerView simpleExoPlayerView){
         simpleExoPlayerView.setPlayer(player);
     }
+    public String getUrl(){
+        return url;
+    }
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.i("LocalService", "Received start id " + startId + ": " + intent);
         filename=intent.getStringExtra("filename");
         url=intent.getStringExtra("url");//local path or internet url
         isLocal=intent.getBooleanExtra("islocal",false);
@@ -60,7 +56,6 @@ public class StreamService extends Service{
                         PendingIntent.FLAG_UPDATE_CURRENT
                 )));
         initializePlayer();
-        Log.i("playerviewval","ended");
         return START_NOT_STICKY;
     }
 
@@ -94,7 +89,7 @@ public class StreamService extends Service{
                 .setContentIntent(pendingIntent)
                 .addAction(R.drawable.close,"",pendingIntentClose)
                 .setTicker(getString(R.string.streaming));
-
+        //there are two pending intents one to open the activity on clicking and another to stop music
         return(b.build());
     }
 
@@ -103,21 +98,15 @@ public class StreamService extends Service{
     public void onDestroy(){
         super.onDestroy();
         player.release();
-        Log.i("ended","service ended");
     }
     public void initializePlayer()
     {
-        //playerView=new SimpleExoPlayerView(this);
-        Log.i("inside","initialized player");
-
         if (player == null) {
             player = ExoPlayerFactory.newSimpleInstance(this,
                     new DefaultTrackSelector(), new DefaultLoadControl());
         }
-        //playerView.setPlayer(player);
         player.setPlayWhenReady(playWhenReady);
         player.seekTo(currentWindow, playbackPosition);
-    //    player.addListener(this);
         MediaSource mediaSource;
         if (isLocal)
             mediaSource = buildLocalMediaSource(Uri.fromFile(new File(url)), this);
@@ -127,11 +116,9 @@ public class StreamService extends Service{
     }
 
     private MediaSource buildLocalMediaSource(Uri path, Context context) {
-        Log.i("info","localmediacalled"+path);
         return new ExtractorMediaSource(path,
                 new DefaultDataSourceFactory(context,"ua"),
                 new DefaultExtractorsFactory(), null, null);
-
     }
 
 
@@ -144,7 +131,4 @@ public class StreamService extends Service{
                 true),
                 new DefaultExtractorsFactory(), null, null);
     }
-
-
-
 }
